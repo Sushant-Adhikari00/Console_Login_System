@@ -6,13 +6,20 @@ namespace AccountRegistrationLoginApp
 {
     class AccountSystem
     {
-        private readonly string accountFolder = "accounts";
-        private readonly string commonPasswordFile = "common_passwords.txt";
+        private readonly string basePath = AppDomain.CurrentDomain.BaseDirectory;
+
+        private string accountFolder;
+        private string commonPasswordFile;
+
         private HashSet<string> commonPasswords;
 
         public AccountSystem()
         {
+            accountFolder = Path.Combine(basePath, "accounts");
+            commonPasswordFile = Path.Combine(basePath, "common_passwords.txt");
+
             CreateAccountFolder();
+            EnsurePasswordFileExists();
             LoadCommonPasswords();
         }
 
@@ -24,31 +31,40 @@ namespace AccountRegistrationLoginApp
             }
         }
 
+        // Only creates empty file (NO passwords inside code)
+        private void EnsurePasswordFileExists()
+        {
+            if (!File.Exists(commonPasswordFile))
+            {
+                File.Create(commonPasswordFile).Close();
+
+                Console.WriteLine("\nIMPORTANT:");
+                Console.WriteLine("common_passwords.txt created at:");
+                Console.WriteLine(commonPasswordFile);
+                Console.WriteLine("Please open it and add common passwords.\n");
+            }
+        }
+
         private void LoadCommonPasswords()
         {
             commonPasswords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             try
             {
-                if (File.Exists(commonPasswordFile))
+                foreach (string line in File.ReadAllLines(commonPasswordFile))
                 {
-                    foreach (string line in File.ReadAllLines(commonPasswordFile))
+                    string password = line.Trim();
+                    if (!string.IsNullOrEmpty(password))
                     {
-                        string password = line.Trim();
-                        if (!string.IsNullOrEmpty(password))
-                        {
-                            commonPasswords.Add(password);
-                        }
+                        commonPasswords.Add(password);
                     }
                 }
-                else
-                {
-                    Console.WriteLine("Warning: common_passwords.txt file not found.");
-                }
+
+                Console.WriteLine("Loaded passwords: " + commonPasswords.Count);
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error loading common passwords: " + ex.Message);
+                Console.WriteLine("Error reading password file: " + ex.Message);
             }
         }
 
@@ -62,59 +78,59 @@ namespace AccountRegistrationLoginApp
 
             if (!IsValidUsername(username))
             {
-                Console.WriteLine("Username contains invalid characters.");
+                Console.WriteLine("Invalid username.");
                 return false;
             }
 
             if (IsUsernameTaken(username))
             {
-                Console.WriteLine("Registration failed: Username already exists.");
+                Console.WriteLine("Username already exists.");
                 return false;
             }
 
-            if (string.IsNullOrEmpty(password) || password.Length < 10)
+            if (password.Length < 10)
             {
-                Console.WriteLine("Registration failed: Password must be at least 10 characters long.");
+                Console.WriteLine("Password must be at least 10 characters.");
                 return false;
             }
 
             if (commonPasswords.Contains(password))
             {
-                Console.WriteLine("Registration failed: Password is too common. Choose a stronger password.");
+                Console.WriteLine("Password is too common.");
                 return false;
             }
 
-            return SaveUserToFile(username, password);
+            return SaveUser(username, password);
         }
 
         public bool LoginUser(string username, string password)
         {
-            string filePath = GetUserFilePath(username);
+            string path = GetUserFilePath(username);
 
-            if (!File.Exists(filePath))
+            if (!File.Exists(path))
             {
-                Console.WriteLine("Login unsuccessful: Username not found.");
+                Console.WriteLine("Username not found.");
                 return false;
             }
 
             try
             {
-                string[] lines = File.ReadAllLines(filePath);
+                string[] data = File.ReadAllLines(path);
 
-                if (lines.Length >= 2 &&
-                    lines[0] == username &&
-                    lines[1] == password)
+                if (data.Length >= 2 &&
+                    data[0] == username &&
+                    data[1] == password)
                 {
                     Console.WriteLine("Login successful!");
                     return true;
                 }
 
-                Console.WriteLine("Login unsuccessful: Incorrect password.");
+                Console.WriteLine("Incorrect password.");
                 return false;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error reading user file: " + ex.Message);
+                Console.WriteLine("Error reading file: " + ex.Message);
                 return false;
             }
         }
@@ -134,14 +150,12 @@ namespace AccountRegistrationLoginApp
             foreach (char c in Path.GetInvalidFileNameChars())
             {
                 if (username.Contains(c))
-                {
                     return false;
-                }
             }
             return true;
         }
 
-        private bool SaveUserToFile(string username, string password)
+        private bool SaveUser(string username, string password)
         {
             try
             {
@@ -151,7 +165,7 @@ namespace AccountRegistrationLoginApp
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error saving user file: " + ex.Message);
+                Console.WriteLine("Error saving user: " + ex.Message);
                 return false;
             }
         }
@@ -161,48 +175,48 @@ namespace AccountRegistrationLoginApp
     {
         static void Main()
         {
-            AccountSystem accountSystem = new AccountSystem();
+            AccountSystem system = new AccountSystem();
             bool running = true;
 
             while (running)
             {
-                Console.WriteLine("\n=== Account Registration and Login System ===");
+                Console.WriteLine("\n==== MENU ====");
                 Console.WriteLine("1. Register");
                 Console.WriteLine("2. Login");
                 Console.WriteLine("3. Quit");
-                Console.Write("Enter your choice: ");
+                Console.Write("Choice: ");
 
                 string choice = Console.ReadLine();
 
                 switch (choice)
                 {
                     case "1":
-                        Console.Write("Enter a username: ");
-                        string regUsername = Console.ReadLine();
+                        Console.Write("Username: ");
+                        string u1 = Console.ReadLine();
 
-                        Console.Write("Enter a password: ");
-                        string regPassword = Console.ReadLine();
+                        Console.Write("Password: ");
+                        string p1 = Console.ReadLine();
 
-                        accountSystem.RegisterUser(regUsername, regPassword);
+                        system.RegisterUser(u1, p1);
                         break;
 
                     case "2":
-                        Console.Write("Enter your username: ");
-                        string loginUsername = Console.ReadLine();
+                        Console.Write("Username: ");
+                        string u2 = Console.ReadLine();
 
-                        Console.Write("Enter your password: ");
-                        string loginPassword = Console.ReadLine();
+                        Console.Write("Password: ");
+                        string p2 = Console.ReadLine();
 
-                        accountSystem.LoginUser(loginUsername, loginPassword);
+                        system.LoginUser(u2, p2);
                         break;
 
                     case "3":
-                        Console.WriteLine("Exiting program...");
                         running = false;
+                        Console.WriteLine("Goodbye!");
                         break;
 
                     default:
-                        Console.WriteLine("Invalid choice. Please try again.");
+                        Console.WriteLine("Invalid option.");
                         break;
                 }
             }
